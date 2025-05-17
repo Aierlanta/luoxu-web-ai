@@ -4,11 +4,39 @@
   import { onMount, setContext } from "svelte";
   import Message from "./Message.svelte";
   import Name from "./Name.svelte";
+  import AIConfig from "./AIConfig.svelte";
+  import AISummary from "./AISummary.svelte";
   import { sleep } from "./util.js";
   import "./global.css";
 
+  // 配置后端URL
   const LUOXU_URL = "https://lab.lilydjwg.me/luoxu";
   const islocal = LUOXU_URL.startsWith("http://localhost");
+
+  // 添加登出功能
+  function logout() {
+    localStorage.removeItem("luoxu_logged_in");
+    window.location.reload();
+  }
+
+  // 添加时间筛选和消息数量选择
+  // 获取当前日期和时间
+  const currentDate = new Date();
+  const today = currentDate.toISOString().split('T')[0]; // 格式：YYYY-MM-DD
+  const currentTime = currentDate.toTimeString().slice(0, 5); // 格式：HH:MM
+
+  // 设置默认值
+  let startDate = $state(today);
+  let startTime = $state("00:00");
+  let endDate = $state(today);
+  let endTime = $state(currentTime);
+  let messageLimit = $state(50);
+  let showTimeFilter = $state(false);
+  let showAISummary = $state(false);
+
+  // 消息计数
+  let filteredMessageCount = $state(0);
+  let showMessageCount = $state(false);
   let groups: { group_id: string; name: string }[] = $state([]);
   let group: string = $state();
   let query: string = $state();
@@ -135,6 +163,25 @@
       if (sender) {
         q.append("sender", sender);
       }
+
+      // 添加时间筛选参数
+      if (showTimeFilter && startDate) {
+        // 创建完整的日期时间对象
+        const startDateTime = new Date(`${startDate}T${startTime || '00:00'}`);
+        const startTimestamp = Math.floor(startDateTime.getTime() / 1000);
+        q.append("start", startTimestamp.toString());
+      }
+      if (showTimeFilter && endDate) {
+        // 创建完整的日期时间对象
+        const endDateTime = new Date(`${endDate}T${endTime || '23:59'}`);
+        const endTimestamp = Math.floor(endDateTime.getTime() / 1000);
+        q.append("end", endTimestamp.toString());
+      }
+
+      // 添加消息数量限制
+      if (messageLimit > 0) {
+        q.append("limit", messageLimit.toString());
+      }
       let url: RequestInfo | URL;
       const qstr = q.toString();
       if (!more) {
@@ -188,6 +235,60 @@
     result.messages = [...old_msgs, ...new_result.messages];
     result.has_more = new_result.has_more;
   }
+
+  // 获取指定时间范围内的消息数量
+  async function countFilteredMessages() {
+    if (!group && !islocal) {
+      error = "请选择要搜索的群组";
+      return;
+    }
+
+    if (!startDate || !endDate) {
+      error = "请设置开始和结束日期";
+      return;
+    }
+
+    error = "";
+
+    try {
+      // 创建完整的日期时间对象
+      const startDateTime = new Date(`${startDate}T${startTime || '00:00'}`);
+      const endDateTime = new Date(`${endDate}T${endTime || '23:59'}`);
+
+      const startTimestamp = Math.floor(startDateTime.getTime() / 1000);
+      const endTimestamp = Math.floor(endDateTime.getTime() / 1000);
+
+      const q = new URLSearchParams();
+      if (group) {
+        q.append("g", group);
+      }
+      if (query) {
+        q.append("q", query);
+      }
+      if (sender) {
+        q.append("sender", sender);
+      }
+
+      q.append("start", startTimestamp.toString());
+      q.append("end", endTimestamp.toString());
+      q.append("count", "true"); // 只获取消息数量
+
+      const url = `${LUOXU_URL}/search?${q}`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data && data.count !== undefined) {
+        filteredMessageCount = data.count;
+        showMessageCount = true;
+      } else {
+        throw new Error("获取消息数量失败");
+      }
+    } catch (e) {
+      error = e.message || "获取消息数量失败";
+      console.error(e);
+    }
+  }
 </script>
 
 <svelte:window
@@ -197,6 +298,14 @@
 />
 
 <main>
+  <div class="header">
+    <h1>落絮</h1>
+    <button class="logout-button" onclick={logout}>登出</button>
+  </div>
+
+  <!-- AI配置组件 -->
+  <AIConfig />
+
   <div id="searchbox">
     {#if groups.length === 0}
       <select>
@@ -225,6 +334,65 @@
     <Name {group} bind:selected={sender} {selected_init} />
     <button onclick={() => do_search()}>搜索</button>
   </div>
+
+  <!-- 时间筛选和消息数量控制 -->
+  <div class="filter-controls">
+    <button onclick={() => showTimeFilter = !showTimeFilter}>
+      {showTimeFilter ? "隐藏时间筛选" : "显示时间筛选"}
+    </button>
+
+    {#if showTimeFilter}
+      <div class="time-filter">
+        <div class="filter-item">
+          <label for="start-date">开始日期时间:</label>
+          <div class="datetime-input">
+            <input id="start-date" type="date" bind:value={startDate} />
+            <input id="start-time" type="time" bind:value={startTime} />
+          </div>
+        </div>
+        <div class="filter-item">
+          <label for="end-date">结束日期时间:</label>
+          <div class="datetime-input">
+            <input id="end-date" type="date" bind:value={endDate} />
+            <input id="end-time" type="time" bind:value={endTime} />
+          </div>
+        </div>
+        <div class="filter-item">
+          <label for="message-limit">消息数量限制:</label>
+          <input
+            id="message-limit"
+            type="number"
+            bind:value={messageLimit}
+            min="1"
+            max="1000"
+          />
+        </div>
+
+        {#if showMessageCount && filteredMessageCount > 0}
+          <div class="message-count">
+            <p>时间段内共有 <strong>{filteredMessageCount}</strong> 条消息</p>
+          </div>
+        {/if}
+
+        <button
+          class="count-button"
+          onclick={() => countFilteredMessages()}
+          disabled={!startDate || !endDate}
+        >
+          统计消息数量
+        </button>
+      </div>
+    {/if}
+
+    <button onclick={() => showAISummary = !showAISummary}>
+      {showAISummary ? "隐藏AI总结" : "显示AI总结"}
+    </button>
+  </div>
+
+  <!-- AI总结组件 -->
+  {#if showAISummary && result && result.messages && result.messages.length > 0}
+    <AISummary messages={result.messages} groupinfo={result.groupinfo} isSearchResult={true} />
+  {/if}
 
   {#if result}
     {#each result.messages as message}
@@ -278,6 +446,30 @@
     white-space: nowrap;
   }
 
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .logout-button {
+    padding: 0.5rem 1rem;
+    background-color: var(--color-btn-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .logout-button:hover {
+    background-color: var(--color-hover);
+  }
+
   #searchbox {
     display: flex;
     margin-left: 1px;
@@ -294,6 +486,66 @@
     #searchbox {
       flex-direction: column;
     }
+  }
+
+  .filter-controls {
+    margin: 1rem 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .time-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background-color: var(--color-bg);
+    width: 100%;
+  }
+
+  .filter-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .filter-item input {
+    padding: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background-color: var(--color-bg);
+  }
+
+  .datetime-input {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .datetime-input input[type="time"] {
+    min-width: 100px;
+  }
+
+  .message-count {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    margin: 0.5rem 0;
+  }
+
+  .message-count p {
+    margin: 0;
+  }
+
+  .count-button {
+    margin-top: 0.5rem;
   }
 
   .error {

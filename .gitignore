@@ -1,5 +1,72 @@
+# 依赖目录
 /node_modules/
-/public/build/
+/server/node_modules/
 
+# 构建输出
+/public/build/
+/dist/
+/build/
+
+# 日志文件
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 环境变量文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 编辑器目录和文件
+.vscode/*
+!.vscode/extensions.json
+.idea/
 .DS_Store
-.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 缓存目录
+.npm
+.eslintcache
+.stylelintcache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# 测试覆盖率目录
+coverage/
+.nyc_output
+
+# 临时文件
+.temp
+.tmp
+.cache
+
+# 配置文件
+server/config.json
+
+# Replit特定文件
+.replit
+replit.nix
+.config/
+
+# 其他
+*.tgz
+.yarn-integrity
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
