@@ -10,7 +10,7 @@
   import "./global.css";
 
   // 配置后端URL
-  const LUOXU_URL = "https://lab.lilydjwg.me/luoxu";
+  const LUOXU_URL = "/luoxu_api/luoxu";
   const islocal = LUOXU_URL.startsWith("http://localhost");
 
   // 添加登出功能
@@ -33,6 +33,7 @@
   let messageLimit = $state(50);
   let showTimeFilter = $state(false);
   let showAISummary = $state(false);
+  let aiSummaryLastXCount = $state(100); // 新增: AI总结的默认消息数量
 
   // 消息计数
   let filteredMessageCount = $state(0);
@@ -167,13 +168,15 @@
       // 添加时间筛选参数
       if (showTimeFilter && startDate) {
         // 创建完整的日期时间对象
-        const startDateTime = new Date(`${startDate}T${startTime || '00:00'}`);
+        const formattedStartDate = startDate.replace(/\//g, '-');
+        const startDateTime = new Date(`${formattedStartDate}T${startTime || '00:00'}`);
         const startTimestamp = Math.floor(startDateTime.getTime() / 1000);
         q.append("start", startTimestamp.toString());
       }
       if (showTimeFilter && endDate) {
         // 创建完整的日期时间对象
-        const endDateTime = new Date(`${endDate}T${endTime || '23:59'}`);
+        const formattedEndDate = endDate.replace(/\//g, '-');
+        const endDateTime = new Date(`${formattedEndDate}T${endTime || '23:59'}`);
         const endTimestamp = Math.floor(endDateTime.getTime() / 1000);
         q.append("end", endTimestamp.toString());
       }
@@ -252,8 +255,11 @@
 
     try {
       // 创建完整的日期时间对象
-      const startDateTime = new Date(`${startDate}T${startTime || '00:00'}`);
-      const endDateTime = new Date(`${endDate}T${endTime || '23:59'}`);
+      const formattedStartDate = startDate.replace(/\//g, '-');
+      const formattedEndDate = endDate.replace(/\//g, '-');
+
+      const startDateTime = new Date(`${formattedStartDate}T${startTime || '00:00'}`);
+      const endDateTime = new Date(`${formattedEndDate}T${endTime || '23:59'}`);
 
       const startTimestamp = Math.floor(startDateTime.getTime() / 1000);
       const endTimestamp = Math.floor(endDateTime.getTime() / 1000);
@@ -391,7 +397,15 @@
 
   <!-- AI总结组件 -->
   {#if showAISummary && result && result.messages && result.messages.length > 0}
-    <AISummary messages={result.messages} groupinfo={result.groupinfo} isSearchResult={true} />
+    <div class="ai-summary-controls">
+      <label for="ai-summary-count">总结最近消息条数:</label>
+      <input id="ai-summary-count" type="number" bind:value={aiSummaryLastXCount} min="1" />
+    </div>
+    <AISummary
+      messages={result.messages.slice(Math.max(0, result.messages.length - aiSummaryLastXCount))}
+      groupinfo={result.groupinfo}
+      isSearchResult={true}
+    />
   {/if}
 
   {#if result}
@@ -564,5 +578,27 @@
   .info > p {
     border: 1px solid var(--color-border);
     border-radius: 2em;
+  }
+
+  .ai-summary-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background-color: var(--color-bg);
+  }
+
+  .ai-summary-controls label {
+    white-space: nowrap;
+  }
+
+  .ai-summary-controls input[type="number"] {
+    width: 60px; /* Adjust width as needed */
+    padding: 0.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
   }
 </style>

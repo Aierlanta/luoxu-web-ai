@@ -70,3 +70,4 @@ replit.nix
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+.codelf/
