@@ -1,3 +1,5 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Aierlanta/luoxu-web-ai)
+
 # Luoxu Web AI
 
 这是 [luoxu](https://github.com/lilydjwg/luoxu) 的Web前端，增强了AI总结功能。
